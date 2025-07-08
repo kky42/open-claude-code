@@ -629,13 +629,16 @@ def convert_anthropic_to_litellm(anthropic_request: MessagesRequest) -> Dict[str
                 
                 messages.append({"role": msg.role, "content": processed_content})
     
-    # Cap max_tokens for non-Anthropic models to their limit of 16384
+    # Cap max_tokens for non-Anthropic models based on their specific limits
     max_tokens = anthropic_request.max_tokens
-    if (anthropic_request.model.startswith("openai/") or
-        anthropic_request.model.startswith("gemini/") or
-        anthropic_request.model.startswith("openrouter/") or
-        anthropic_request.model.startswith("deepseek/") or
-        anthropic_request.model.startswith("openai-compatible/")):
+    if anthropic_request.model.startswith("deepseek/"):
+        # Deepseek has a lower limit of 8192
+        max_tokens = min(max_tokens, 8192)
+        logger.debug(f"Capping max_tokens to 8192 for Deepseek model (original value: {anthropic_request.max_tokens})")
+    elif (anthropic_request.model.startswith("openai/") or
+          anthropic_request.model.startswith("gemini/") or
+          anthropic_request.model.startswith("openrouter/") or
+          anthropic_request.model.startswith("openai-compatible/")):
         max_tokens = min(max_tokens, 16384)
         logger.debug(f"Capping max_tokens to 16384 for non-Anthropic model (original value: {anthropic_request.max_tokens})")
     
@@ -1433,16 +1436,28 @@ async def create_message(
         # Check for LiteLLM-specific attributes
         for attr in ['message', 'status_code', 'response', 'llm_provider', 'model']:
             if hasattr(e, attr):
-                error_details[attr] = getattr(e, attr)
-        
+                attr_value = getattr(e, attr)
+                # Convert non-serializable objects to strings
+                try:
+                    json.dumps(attr_value)  # Test if it's JSON serializable
+                    error_details[attr] = attr_value
+                except (TypeError, ValueError):
+                    error_details[attr] = str(attr_value)
+
         # Check for additional exception details in dictionaries
         if hasattr(e, '__dict__'):
             for key, value in e.__dict__.items():
                 if key not in error_details and key not in ['args', '__traceback__']:
+                    # Always convert to string to avoid serialization issues
                     error_details[key] = str(value)
-        
-        # Log all error details
-        logger.error(f"Error processing request: {json.dumps(error_details, indent=2)}")
+
+        # Log all error details with safe JSON serialization
+        try:
+            logger.error(f"Error processing request: {json.dumps(error_details, indent=2)}")
+        except (TypeError, ValueError) as json_error:
+            # Fallback if JSON serialization still fails
+            logger.error(f"Error processing request (JSON serialization failed): {str(error_details)}")
+            logger.error(f"JSON serialization error: {str(json_error)}")
         
         # Format error for response
         error_message = f"Error: {str(e)}"
