@@ -894,7 +894,9 @@ def convert_litellm_to_anthropic(litellm_response: Union[Dict[str, Any], Any],
             stop_sequence=None,
             usage=Usage(
                 input_tokens=prompt_tokens,
-                output_tokens=completion_tokens
+                output_tokens=completion_tokens,
+                cache_creation_input_tokens=0,
+                cache_read_input_tokens=0
             )
         )
         
@@ -913,7 +915,12 @@ def convert_litellm_to_anthropic(litellm_response: Union[Dict[str, Any], Any],
             role="assistant",
             content=[{"type": "text", "text": f"Error converting response: {str(e)}. Please check server logs."}],
             stop_reason="end_turn",
-            usage=Usage(input_tokens=0, output_tokens=0)
+            usage=Usage(
+                input_tokens=0,
+                output_tokens=0,
+                cache_creation_input_tokens=0,
+                cache_read_input_tokens=0
+            )
         )
 
 async def handle_streaming(response_generator, original_request: MessagesRequest):
@@ -1127,8 +1134,13 @@ async def handle_streaming(response_generator, original_request: MessagesRequest
                             stop_reason = "end_turn"
                         
                         # Send message_delta with stop reason and usage
-                        usage = {"output_tokens": output_tokens}
-                        
+                        usage = {
+                            "input_tokens": input_tokens,
+                            "output_tokens": output_tokens,
+                            "cache_creation_input_tokens": 0,
+                            "cache_read_input_tokens": 0
+                        }
+
                         yield f"event: message_delta\ndata: {json.dumps({'type': 'message_delta', 'delta': {'stop_reason': stop_reason, 'stop_sequence': None}, 'usage': usage})}\n\n"
                         
                         # Send message_stop event
@@ -1153,8 +1165,13 @@ async def handle_streaming(response_generator, original_request: MessagesRequest
             yield f"event: content_block_stop\ndata: {json.dumps({'type': 'content_block_stop', 'index': 0})}\n\n"
             
             # Send final message_delta with usage
-            usage = {"output_tokens": output_tokens}
-            
+            usage = {
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 0
+            }
+
             yield f"event: message_delta\ndata: {json.dumps({'type': 'message_delta', 'delta': {'stop_reason': 'end_turn', 'stop_sequence': None}, 'usage': usage})}\n\n"
             
             # Send message_stop event
@@ -1170,7 +1187,13 @@ async def handle_streaming(response_generator, original_request: MessagesRequest
         logger.error(error_message)
         
         # Send error message_delta
-        yield f"event: message_delta\ndata: {json.dumps({'type': 'message_delta', 'delta': {'stop_reason': 'error', 'stop_sequence': None}, 'usage': {'output_tokens': 0}})}\n\n"
+        error_usage = {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0
+        }
+        yield f"event: message_delta\ndata: {json.dumps({'type': 'message_delta', 'delta': {'stop_reason': 'error', 'stop_sequence': None}, 'usage': error_usage})}\n\n"
         
         # Send message_stop event
         yield f"event: message_stop\ndata: {json.dumps({'type': 'message_stop'})}\n\n"
@@ -1594,8 +1617,8 @@ def log_request_beautifully(method, path, claude_model, openai_model, num_messag
 if __name__ == "__main__":
     import sys
     if len(sys.argv) > 1 and sys.argv[1] == "--help":
-        print("Run with: uvicorn server:app --reload --host 0.0.0.0 --port 8082")
+        print("Run with: uvicorn server:app --reload --host 0.0.0.0 --port 8083")
         sys.exit(0)
-    
+
     # Configure uvicorn to run with minimal logs
-    uvicorn.run(app, host="0.0.0.0", port=8082, log_level="error")
+    uvicorn.run(app, host="0.0.0.0", port=8083, log_level="error")
