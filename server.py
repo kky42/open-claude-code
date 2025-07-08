@@ -81,6 +81,10 @@ app = FastAPI()
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
+OPENAI_COMPATIBLE_API_KEY = os.environ.get("OPENAI_COMPATIBLE_API_KEY")
+OPENAI_COMPATIBLE_BASE_URL = os.environ.get("OPENAI_COMPATIBLE_BASE_URL")
 
 # Get preferred provider (default to openai)
 PREFERRED_PROVIDER = os.environ.get("PREFERRED_PROVIDER", "openai").lower()
@@ -111,6 +115,34 @@ GEMINI_MODELS = [
     "gemini-2.5-pro-preview-03-25",
     "gemini-2.0-flash"
 ]
+
+# List of OpenRouter models
+OPENROUTER_MODELS = [
+    "anthropic/claude-3.5-sonnet",
+    "anthropic/claude-3-sonnet",
+    "anthropic/claude-3-haiku",
+    "openai/gpt-4o",
+    "openai/gpt-4o-mini",
+    "openai/gpt-4-turbo",
+    "openai/o1-preview",
+    "openai/o1-mini",
+    "google/gemini-pro-1.5",
+    "meta-llama/llama-3.1-405b-instruct",
+    "meta-llama/llama-3.1-70b-instruct",
+    "meta-llama/llama-3.1-8b-instruct",
+    "mistralai/mistral-large",
+    "mistralai/mistral-medium",
+    "cohere/command-r-plus"
+]
+
+# List of Deepseek models
+DEEPSEEK_MODELS = [
+    "deepseek-chat",
+    "deepseek-coder"
+]
+
+# List of OpenAI-compatible models (can be configured via environment)
+OPENAI_COMPATIBLE_MODELS = []
 
 # Helper function to clean schema for Gemini
 def clean_gemini_schema(schema: Any) -> Any:
@@ -202,6 +234,12 @@ class MessagesRequest(BaseModel):
             clean_v = clean_v[7:]
         elif clean_v.startswith('gemini/'):
             clean_v = clean_v[7:]
+        elif clean_v.startswith('openrouter/'):
+            clean_v = clean_v[11:]
+        elif clean_v.startswith('deepseek/'):
+            clean_v = clean_v[9:]
+        elif clean_v.startswith('openai-compatible/'):
+            clean_v = clean_v[18:]
 
         # --- Mapping Logic --- START ---
         mapped = False
@@ -209,6 +247,15 @@ class MessagesRequest(BaseModel):
         if 'haiku' in clean_v.lower():
             if PREFERRED_PROVIDER == "google" and SMALL_MODEL in GEMINI_MODELS:
                 new_model = f"gemini/{SMALL_MODEL}"
+                mapped = True
+            elif PREFERRED_PROVIDER == "openrouter" and SMALL_MODEL in OPENROUTER_MODELS:
+                new_model = f"openrouter/{SMALL_MODEL}"
+                mapped = True
+            elif PREFERRED_PROVIDER == "deepseek" and SMALL_MODEL in DEEPSEEK_MODELS:
+                new_model = f"deepseek/{SMALL_MODEL}"
+                mapped = True
+            elif PREFERRED_PROVIDER == "openai-compatible":
+                new_model = f"openai-compatible/{SMALL_MODEL}"
                 mapped = True
             else:
                 new_model = f"openai/{SMALL_MODEL}"
@@ -218,6 +265,15 @@ class MessagesRequest(BaseModel):
         elif 'sonnet' in clean_v.lower():
             if PREFERRED_PROVIDER == "google" and BIG_MODEL in GEMINI_MODELS:
                 new_model = f"gemini/{BIG_MODEL}"
+                mapped = True
+            elif PREFERRED_PROVIDER == "openrouter" and BIG_MODEL in OPENROUTER_MODELS:
+                new_model = f"openrouter/{BIG_MODEL}"
+                mapped = True
+            elif PREFERRED_PROVIDER == "deepseek" and BIG_MODEL in DEEPSEEK_MODELS:
+                new_model = f"deepseek/{BIG_MODEL}"
+                mapped = True
+            elif PREFERRED_PROVIDER == "openai-compatible":
+                new_model = f"openai-compatible/{BIG_MODEL}"
                 mapped = True
             else:
                 new_model = f"openai/{BIG_MODEL}"
@@ -231,13 +287,22 @@ class MessagesRequest(BaseModel):
             elif clean_v in OPENAI_MODELS and not v.startswith('openai/'):
                 new_model = f"openai/{clean_v}"
                 mapped = True # Technically mapped to add prefix
+            elif clean_v in OPENROUTER_MODELS and not v.startswith('openrouter/'):
+                new_model = f"openrouter/{clean_v}"
+                mapped = True # Technically mapped to add prefix
+            elif clean_v in DEEPSEEK_MODELS and not v.startswith('deepseek/'):
+                new_model = f"deepseek/{clean_v}"
+                mapped = True # Technically mapped to add prefix
+            elif clean_v in OPENAI_COMPATIBLE_MODELS and not v.startswith('openai-compatible/'):
+                new_model = f"openai-compatible/{clean_v}"
+                mapped = True # Technically mapped to add prefix
         # --- Mapping Logic --- END ---
 
         if mapped:
             logger.debug(f"📌 MODEL MAPPING: '{original_model}' ➡️ '{new_model}'")
         else:
              # If no mapping occurred and no prefix exists, log warning or decide default
-             if not v.startswith(('openai/', 'gemini/', 'anthropic/')):
+             if not v.startswith(('openai/', 'gemini/', 'anthropic/', 'openrouter/', 'deepseek/', 'openai-compatible/')):
                  logger.warning(f"⚠️ No prefix or mapping rule for model: '{original_model}'. Using as is.")
              new_model = v # Ensure we return the original if no rule applied
 
@@ -275,6 +340,12 @@ class TokenCountRequest(BaseModel):
             clean_v = clean_v[7:]
         elif clean_v.startswith('gemini/'):
             clean_v = clean_v[7:]
+        elif clean_v.startswith('openrouter/'):
+            clean_v = clean_v[11:]
+        elif clean_v.startswith('deepseek/'):
+            clean_v = clean_v[9:]
+        elif clean_v.startswith('openai-compatible/'):
+            clean_v = clean_v[18:]
 
         # --- Mapping Logic --- START ---
         mapped = False
@@ -282,6 +353,15 @@ class TokenCountRequest(BaseModel):
         if 'haiku' in clean_v.lower():
             if PREFERRED_PROVIDER == "google" and SMALL_MODEL in GEMINI_MODELS:
                 new_model = f"gemini/{SMALL_MODEL}"
+                mapped = True
+            elif PREFERRED_PROVIDER == "openrouter" and SMALL_MODEL in OPENROUTER_MODELS:
+                new_model = f"openrouter/{SMALL_MODEL}"
+                mapped = True
+            elif PREFERRED_PROVIDER == "deepseek" and SMALL_MODEL in DEEPSEEK_MODELS:
+                new_model = f"deepseek/{SMALL_MODEL}"
+                mapped = True
+            elif PREFERRED_PROVIDER == "openai-compatible":
+                new_model = f"openai-compatible/{SMALL_MODEL}"
                 mapped = True
             else:
                 new_model = f"openai/{SMALL_MODEL}"
@@ -291,6 +371,15 @@ class TokenCountRequest(BaseModel):
         elif 'sonnet' in clean_v.lower():
             if PREFERRED_PROVIDER == "google" and BIG_MODEL in GEMINI_MODELS:
                 new_model = f"gemini/{BIG_MODEL}"
+                mapped = True
+            elif PREFERRED_PROVIDER == "openrouter" and BIG_MODEL in OPENROUTER_MODELS:
+                new_model = f"openrouter/{BIG_MODEL}"
+                mapped = True
+            elif PREFERRED_PROVIDER == "deepseek" and BIG_MODEL in DEEPSEEK_MODELS:
+                new_model = f"deepseek/{BIG_MODEL}"
+                mapped = True
+            elif PREFERRED_PROVIDER == "openai-compatible":
+                new_model = f"openai-compatible/{BIG_MODEL}"
                 mapped = True
             else:
                 new_model = f"openai/{BIG_MODEL}"
@@ -304,12 +393,21 @@ class TokenCountRequest(BaseModel):
             elif clean_v in OPENAI_MODELS and not v.startswith('openai/'):
                 new_model = f"openai/{clean_v}"
                 mapped = True # Technically mapped to add prefix
+            elif clean_v in OPENROUTER_MODELS and not v.startswith('openrouter/'):
+                new_model = f"openrouter/{clean_v}"
+                mapped = True # Technically mapped to add prefix
+            elif clean_v in DEEPSEEK_MODELS and not v.startswith('deepseek/'):
+                new_model = f"deepseek/{clean_v}"
+                mapped = True # Technically mapped to add prefix
+            elif clean_v in OPENAI_COMPATIBLE_MODELS and not v.startswith('openai-compatible/'):
+                new_model = f"openai-compatible/{clean_v}"
+                mapped = True # Technically mapped to add prefix
         # --- Mapping Logic --- END ---
 
         if mapped:
             logger.debug(f"📌 TOKEN COUNT MAPPING: '{original_model}' ➡️ '{new_model}'")
         else:
-             if not v.startswith(('openai/', 'gemini/', 'anthropic/')):
+             if not v.startswith(('openai/', 'gemini/', 'anthropic/', 'openrouter/', 'deepseek/', 'openai-compatible/')):
                  logger.warning(f"⚠️ No prefix or mapping rule for token count model: '{original_model}'. Using as is.")
              new_model = v # Ensure we return the original if no rule applied
 
@@ -531,11 +629,15 @@ def convert_anthropic_to_litellm(anthropic_request: MessagesRequest) -> Dict[str
                 
                 messages.append({"role": msg.role, "content": processed_content})
     
-    # Cap max_tokens for OpenAI models to their limit of 16384
+    # Cap max_tokens for non-Anthropic models to their limit of 16384
     max_tokens = anthropic_request.max_tokens
-    if anthropic_request.model.startswith("openai/") or anthropic_request.model.startswith("gemini/"):
+    if (anthropic_request.model.startswith("openai/") or
+        anthropic_request.model.startswith("gemini/") or
+        anthropic_request.model.startswith("openrouter/") or
+        anthropic_request.model.startswith("deepseek/") or
+        anthropic_request.model.startswith("openai-compatible/")):
         max_tokens = min(max_tokens, 16384)
-        logger.debug(f"Capping max_tokens to 16384 for OpenAI/Gemini model (original value: {anthropic_request.max_tokens})")
+        logger.debug(f"Capping max_tokens to 16384 for non-Anthropic model (original value: {anthropic_request.max_tokens})")
     
     # Create LiteLLM request dict
     litellm_request = {
@@ -1079,6 +1181,14 @@ async def create_message(
     raw_request: Request
 ):
     try:
+        # Check for authentication headers (Claude Code compatibility)
+        auth_header = raw_request.headers.get("authorization")
+        api_key_header = raw_request.headers.get("x-api-key")
+
+        if auth_header or api_key_header:
+            logger.debug("🔑 Authentication headers detected from Claude Code")
+            # Accept any authentication when using proxy mode
+            logger.debug("✅ Authentication accepted for proxy mode")
         # print the body here
         body = await raw_request.body()
     
@@ -1110,6 +1220,17 @@ async def create_message(
         elif request.model.startswith("gemini/"):
             litellm_request["api_key"] = GEMINI_API_KEY
             logger.debug(f"Using Gemini API key for model: {request.model}")
+        elif request.model.startswith("openrouter/"):
+            litellm_request["api_key"] = OPENROUTER_API_KEY
+            logger.debug(f"Using OpenRouter API key for model: {request.model}")
+        elif request.model.startswith("deepseek/"):
+            litellm_request["api_key"] = DEEPSEEK_API_KEY
+            logger.debug(f"Using Deepseek API key for model: {request.model}")
+        elif request.model.startswith("openai-compatible/"):
+            litellm_request["api_key"] = OPENAI_COMPATIBLE_API_KEY
+            if OPENAI_COMPATIBLE_BASE_URL:
+                litellm_request["base_url"] = OPENAI_COMPATIBLE_BASE_URL
+            logger.debug(f"Using OpenAI-compatible API key for model: {request.model}")
         else:
             litellm_request["api_key"] = ANTHROPIC_API_KEY
             logger.debug(f"Using Anthropic API key for model: {request.model}")

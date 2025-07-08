@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Claude Code Proxy Wrapper
+# This script sets up the environment to use Claude Code with your proxy
+
+# Set proxy configuration
+export ANTHROPIC_BASE_URL="http://localhost:8083"
+
+# Try different authentication methods
+if [ -z "$ANTHROPIC_API_KEY" ]; then
+    echo "🔑 Setting dummy API key for proxy mode..."
+    export ANTHROPIC_API_KEY="sk-ant-proxy-dummy-key-$(date +%s)"
+fi
+
+# Also set auth token as fallback
+export ANTHROPIC_AUTH_TOKEN="proxy-auth-token-$(date +%s)"
+
+echo "🚀 Starting Claude Code with proxy configuration..."
+echo "📍 Proxy URL: $ANTHROPIC_BASE_URL"
+echo "🔑 API Key: ${ANTHROPIC_API_KEY:0:20}..."
+
+# Start Claude Code with all arguments passed through
+exec claude "$@"
